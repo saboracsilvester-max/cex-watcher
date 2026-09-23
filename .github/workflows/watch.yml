@@ -1,0 +1,40 @@
+name: CeX stock watch
+
+on:
+  schedule:
+    - cron: "3-59/5 * * * *"   # every 5 min, offset from :00 to dodge the top-of-hour queue
+  workflow_dispatch:            # "Run workflow" button for testing
+
+permissions:
+  contents: write               # to commit seen.json
+
+concurrency:
+  group: cex-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check CeX
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python cex_watch.py
+
+      - name: Save state
+        if: always()
+        run: |
+          if [ -n "$(git status --porcelain seen.json)" ]; then
+            git config user.name "cex-watcher"
+            git config user.email "actions@users.noreply.github.com"
+            git add seen.json
+            git commit -m "Update seen.json"
+            git push
+          fi
