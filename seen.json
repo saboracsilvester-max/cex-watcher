@@ -1,10 +1,10 @@
 {
  "broken": false,
  "fails": 0,
- "heartbeat_day": "2026-09-24",
- "heartbeats_today": 81,
- "last_day": "2026-09-24",
- "last_heartbeat": 1790290267.976733,
+ "heartbeat_day": "2026-09-25",
+ "heartbeats_today": 1,
+ "last_day": "2026-09-25",
+ "last_heartbeat": 1790291111.5288382,
  "national": {
   "SDESCUSI910900K833B|Liverpool Lord St": {
    "box_id": "SDESCUSI910900K833B",
