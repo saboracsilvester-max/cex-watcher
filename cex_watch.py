@@ -7,6 +7,7 @@ Python stdlib only. Usage:
     NTFY_TOPIC=my-secret-topic python cex_watch.py            # normal run
     python cex_watch.py --dry-run                              # print, don't send
 """
+import csv
 import json
 import math
 import os
@@ -18,8 +19,8 @@ import urllib.request
 from datetime import date
 
 # ---------------------------------------------------------------- config
-MODELS = ["3090", "4090", "5090"]
-MODEL_RE = re.compile(r"RTX\s?(3090|4090|5090)(?!\d)", re.I)
+MODELS = ["3090"]
+MODEL_RE = re.compile(r"RTX\s?3090(?!\d)", re.I)  # also matches 3090 Ti
 
 GPU_CATEGORY = "PCI-Express Graphics Cards"
 PC_CATEGORY = "Desktops - Windows"
@@ -45,6 +46,7 @@ NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(HERE, "seen.json")
 LOG_FILE = os.path.join(HERE, "watch.log")
+HISTORY_FILE = os.path.join(HERE, "history.csv")
 TOPIC_FILE = os.path.join(HERE, "ntfy_topic.txt")  # local runs; GitHub uses the secret
 
 
@@ -59,6 +61,12 @@ def _topic():
 
 
 NTFY_TOPIC = _topic()
+# Silent hourly "still running" message (lowest priority, no sound).
+# Updates one notification in place. ntfy.sh's free tier allows 250 messages/day
+# per IP, and hitting it would block the real stock alerts too, so status
+# messages are capped at HEARTBEAT_DAILY_CAP (every 8 min = 180/day).
+HEARTBEAT_MINUTES = 8
+HEARTBEAT_DAILY_CAP = 180
 
 
 # ---------------------------------------------------------------- cex
@@ -137,10 +145,16 @@ def live_where(box_id, kind):
 
 
 def matches():
-    """Return {boxId: {name, price, kind, where[]}} for items we care about."""
+    """Return (found, national).
+
+    found:    {boxId: {name, price, kind, where[]}} for items we alert on.
+    national: {"boxId|place": {...}} every matching item in stock anywhere in
+              the UK, per store (plus "online"), for the history log.
+    """
     NEAR.clear()
     NEAR.update(load_near_stores())
     found = {}
+    national = {}
     for i, model in enumerate(MODELS):
         if i:
             time.sleep(1.5)
@@ -162,6 +176,13 @@ def matches():
                 where += near
             else:
                 continue
+            places = set(h.get("stores") or [])
+            if kind == "GPU" and h.get("inStockOnline") == 1:  # PCs can't be delivered
+                places.add("online")
+            for place in places:
+                national[f"{h['boxId']}|{place}"] = {
+                    "box_id": h["boxId"], "place": place, "kind": kind,
+                    "name": name, "price": h.get("sellPrice")}
             if where:
                 found[h["boxId"]] = {"name": name, "price": h.get("sellPrice"),
                                      "kind": kind, "where": where}
@@ -176,18 +197,47 @@ def matches():
             item["where"] = live
         else:
             del found[box_id]
-    return found
+    return found, national
+
+
+def log_history(state, national):
+    """Append UK-wide appear/disappear events to history.csv.
+
+    Based on CeX's search data, which can lag real stock by up to ~an hour.
+    The first run writes 'baseline' rows (already in stock, arrival unknown).
+    """
+    old = state.get("national")
+    rows = []
+    stamp = time.strftime("%Y-%m-%d %H:%M")
+    if old is None:
+        rows = [("baseline", v) for v in national.values()]
+    else:
+        rows = [("in", v) for k, v in national.items() if k not in old]
+        rows += [("out", v) for k, v in old.items() if k not in national]
+    if rows:
+        new_file = not os.path.exists(HISTORY_FILE)
+        with open(HISTORY_FILE, "a", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            if new_file:
+                w.writerow(["time", "event", "kind", "price", "place", "name", "box_id"])
+            for event, v in rows:
+                w.writerow([stamp, event, v["kind"], v["price"], v["place"], v["name"], v["box_id"]])
+    state["national"] = national
 
 
 # ---------------------------------------------------------------- ntfy
-def notify(title, message, click=None, priority=4, tags=None, dry_run=False):
-    if dry_run or not NTFY_TOPIC:
+def notify(title, message, click=None, priority=4, tags=None, dry_run=False, topic=None,
+           sequence_id=None):
+    topic = topic or NTFY_TOPIC
+    if dry_run or not topic:
         print(f"[notify] {title}\n    {message}\n    {click or ''}")
         return
-    payload = {"topic": NTFY_TOPIC, "title": title, "message": message,
+    payload = {"topic": topic, "title": title, "message": message,
                "priority": priority, "tags": tags or []}
     if click:
         payload["click"] = click
+    if sequence_id:  # same id = replace the earlier notification instead of stacking
+        payload["sequence_id"] = sequence_id
     req = urllib.request.Request(NTFY_SERVER, data=json.dumps(payload).encode(),
                                  headers={"Content-Type": "application/json"})
     urllib.request.urlopen(req, timeout=20).read()
@@ -214,7 +264,7 @@ def main():
     state = load_state()
 
     try:
-        found = matches()
+        found, national = matches()
     except Exception as e:  # network error, 403, schema change...
         print(f"CeX check failed: {e!r}", file=sys.stderr)
         state["fails"] = state.get("fails", 0) + 1
@@ -231,10 +281,16 @@ def main():
                priority=2, tags=["white_check_mark"], dry_run=dry_run)
         state["broken"] = False
     state["fails"] = 0
+    try:
+        log_history(state, national)
+    except Exception as e:  # never let logging stop the alerts
+        print(f"history log failed: {e!r}", file=sys.stderr)
 
-    seen = state.get("seen", {})
+    # Older state files stored just the list of places.
+    seen = {k: (v if isinstance(v, dict) else {"where": v})
+            for k, v in state.get("seen", {}).items()}
     for box_id, item in found.items():
-        new_where = [w for w in item["where"] if w not in seen.get(box_id, [])]
+        new_where = [w for w in item["where"] if w not in seen.get(box_id, {}).get("where", [])]
         if not new_where:
             continue
         emoji = "desktop_computer" if item["kind"] == "PC" else "video_game"
@@ -244,8 +300,36 @@ def main():
                dry_run=dry_run)
         time.sleep(1)
 
+    # Quiet ping when something we alerted on sells, so the phone stays current.
+    for box_id, old in seen.items():
+        if box_id in found or "name" not in old:
+            continue
+        notify(f"Sold/gone: £{old['price']:g} {old['kind']}: {old['name'][:50]}",
+               f"{old['name']}\nNo longer in stock (was: {', '.join(old['where'])})",
+               click=PRODUCT_URL.format(box_id), priority=2, tags=["x"],
+               dry_run=dry_run)
+        time.sleep(1)
+
     # Items that vanish are forgotten, so they alert again if they come back.
-    state["seen"] = {k: v["where"] for k, v in found.items()}
+    state["seen"] = found
+
+    today = date.today().isoformat()
+    if state.get("heartbeat_day") != today:
+        state["heartbeat_day"], state["heartbeats_today"] = today, 0
+    if (time.time() - state.get("last_heartbeat", 0) >= HEARTBEAT_MINUTES * 60 - 30
+            and state["heartbeats_today"] < HEARTBEAT_DAILY_CAP):
+        lines = [f"£{v['price']:g} {v['kind']}: {v['name'][:45]} - {', '.join(v['where'])}"
+                 for v in found.values()] or ["Nothing matching in stock right now."]
+        try:
+            notify(f"Watcher running - checked {time.strftime('%H:%M')}",
+                   f"{len(found)} item(s) in stock:\n" + "\n".join(lines),
+                   priority=1, tags=["heartbeat"], dry_run=dry_run,
+                   sequence_id="watcher-status",
+                   )
+            state["last_heartbeat"] = time.time()
+            state["heartbeats_today"] += 1
+        except Exception as e:
+            print(f"heartbeat failed: {e!r}", file=sys.stderr)
     # Changes once a day -> one commit/day keeps GitHub's 60-day cron timer alive.
     state["last_day"] = date.today().isoformat()
     save_state(state)

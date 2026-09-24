@@ -2,7 +2,7 @@ name: CeX stock watch
 
 on:
   schedule:
-    - cron: "3-59/5 * * * *"   # every 5 min, offset from :00 to dodge the top-of-hour queue
+    - cron: "3-59/5 * * * *"   # every 5 min (GitHub minimum), offset from :00 to dodge the top-of-hour queue
   workflow_dispatch:            # "Run workflow" button for testing
 
 permissions:
@@ -31,10 +31,10 @@ jobs:
       - name: Save state
         if: always()
         run: |
-          if [ -n "$(git status --porcelain seen.json)" ]; then
+          if [ -n "$(git status --porcelain seen.json history.csv)" ]; then
             git config user.name "cex-watcher"
             git config user.email "actions@users.noreply.github.com"
-            git add seen.json
-            git commit -m "Update seen.json"
-            git push
+            git add seen.json history.csv
+            git commit -m "Update state"
+            git pull --rebase -q && git push
           fi

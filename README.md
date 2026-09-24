@@ -1,6 +1,6 @@
 # CeX GPU / PC watcher
 
-Pings your Android phone (via ntfy) when CeX UK lists an **RTX 3090, 4090 or 5090**:
+Pings your Android phone (via ntfy) when CeX UK lists an **RTX 3090** (incl. 3090 Ti):
 
 - **Graphics cards:** in stock online (delivered), or in a CeX store within 40 miles of AL10.
 - **Pre-built PCs** with one of those cards: only when in stock at a CeX store within 40 miles of AL10 (CeX doesn't deliver PCs).
@@ -39,12 +39,14 @@ The topic is read from `ntfy_topic.txt` and output goes to `watch.log`. Both are
 - Resume: `schtasks /change /tn "CeX GPU Watcher" /enable`
 - Remove: `schtasks /delete /tn "CeX GPU Watcher" /f`
 
+To check it's alive: every hour your topic gets a silent "Watcher running" message listing what's in stock.
+
 If you move to GitHub Actions, remove the local task so you don't get double pings.
 
 ## Tweaking (edit `cex_watch.py` on GitHub)
 
 - **Radius:** change `MAX_MILES` (straight-line miles from AL10). `ALWAYS_NEAR` adds stores by name.
-- **Models:** `MODELS` / `MODEL_RE`, e.g. add `3080`.
+- **Models:** `MODELS` / `MODEL_RE`, e.g. add `4090` back with `MODELS = ["3090", "4090"]` and `RTX\s?(3090|4090)(?!\d)`.
 - **eGPUs:** laptop external-GPU boxes (Asus XG Mobile) are skipped by `EXCLUDE_RE`.
 - To test locally: `python cex_watch.py --dry-run` prints alerts instead of sending.
 
