@@ -26,7 +26,11 @@ jobs:
       - name: Check CeX
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python cex_watch.py
+          TZ: Europe/London           # UK times in notifications
+          PYTHONUNBUFFERED: "1"
+        run: |
+          if [ -z "$NTFY_TOPIC" ]; then echo "::warning::NTFY_TOPIC secret is empty - notifications will not be sent"; fi
+          python cex_watch.py
 
       - name: Save state
         if: always()
