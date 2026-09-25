@@ -2,9 +2,9 @@
  "broken": false,
  "fails": 0,
  "heartbeat_day": "2026-09-25",
- "heartbeats_today": 46,
+ "heartbeats_today": 47,
  "last_day": "2026-09-25",
- "last_heartbeat": 1790336109.9841182,
+ "last_heartbeat": 1790337029.534256,
  "national": {
   "SDESCUSI910900K833B|Liverpool Lord St": {
    "box_id": "SDESCUSI910900K833B",
@@ -26,7 +26,31 @@
    "name": "Custom/Ryzen 9 5950X/32GB DDR4/512GB SSD+2x2TB HDD/RTX 3090 Ti 24G/W11/B",
    "place": "Fareham",
    "price": 1850
+  },
+  "SGRAMSI309024G03|East Ham": {
+   "box_id": "SGRAMSI309024G03",
+   "kind": "GPU",
+   "name": "MSi GeForce RTX 3090 SUPRIM X 24GB GDDR6X",
+   "place": "East Ham",
+   "price": 1090
+  },
+  "SGRAMSI309024G03|online": {
+   "box_id": "SGRAMSI309024G03",
+   "kind": "GPU",
+   "name": "MSi GeForce RTX 3090 SUPRIM X 24GB GDDR6X",
+   "place": "online",
+   "price": 1090
   }
  },
- "seen": {}
+ "seen": {
+  "SGRAMSI309024G03": {
+   "kind": "GPU",
+   "name": "MSi GeForce RTX 3090 SUPRIM X 24GB GDDR6X",
+   "price": 1090,
+   "where": [
+    "online (delivery)",
+    "East Ham (20 mi)"
+   ]
+  }
+ }
 }
