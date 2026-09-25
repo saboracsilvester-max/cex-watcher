@@ -2,9 +2,9 @@
  "broken": false,
  "fails": 0,
  "heartbeat_day": "2026-09-25",
- "heartbeats_today": 51,
+ "heartbeats_today": 52,
  "last_day": "2026-09-25",
- "last_heartbeat": 1790341530.5223637,
+ "last_heartbeat": 1790342738.0281696,
  "national": {
   "SDESCUSI910900K833B|Liverpool Lord St": {
    "box_id": "SDESCUSI910900K833B",
@@ -33,7 +33,31 @@
    "name": "MSi GeForce RTX 3090 SUPRIM X 24GB GDDR6X",
    "place": "East Ham",
    "price": 1090
+  },
+  "SGRAZOT3090OC24G01|Bayswater": {
+   "box_id": "SGRAZOT3090OC24G01",
+   "kind": "GPU",
+   "name": "Zotac GeForce RTX 3090 Trinity OC 24GB GDDR6X",
+   "place": "Bayswater",
+   "price": 870
+  },
+  "SGRAZOT3090OC24G01|online": {
+   "box_id": "SGRAZOT3090OC24G01",
+   "kind": "GPU",
+   "name": "Zotac GeForce RTX 3090 Trinity OC 24GB GDDR6X",
+   "place": "online",
+   "price": 870
   }
  },
- "seen": {}
+ "seen": {
+  "SGRAZOT3090OC24G01": {
+   "kind": "GPU",
+   "name": "Zotac GeForce RTX 3090 Trinity OC 24GB GDDR6X",
+   "price": 870,
+   "where": [
+    "online (delivery)",
+    "Bayswater (17 mi)"
+   ]
+  }
+ }
 }
